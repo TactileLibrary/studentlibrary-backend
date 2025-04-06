@@ -120,7 +120,8 @@ const me=task[0]
 res.status(200)
 res.json({
 "username": me.username,
-"email": me.email
+"email": me.email,
+"id": me.id
 })
 }
 catch {
