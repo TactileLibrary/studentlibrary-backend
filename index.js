@@ -192,8 +192,8 @@ app.post("/group/join", checkJWT, async(req, res)=>{
 
 // implement the function that returns the join code for a given group
 app.get("/group/code", checkJWT, async(req, res)=>{
-user=req.userID
-group=req.query.id
+const user=req.userID
+const group=req.query.id
 try {
 const task=await sql`select * from groups where id=${group}`
 const info=task[0]
@@ -229,7 +229,7 @@ app.get("/group/members", checkJWT, async(req,res) => {
         
       const groupData = await sql`select admin from groups where id=${group}`
 
-      if(groupData[0].amdin == user){
+      if(groupData[0].admin == user){
           // if the user is the admin, we return list of names + IDs
           const members = await sql`select u.id as id, u.username as name from users u join group_members gm on u.id=gm.user_id where gm.group_id=${group}`
           res.status(200)
@@ -248,6 +248,27 @@ app.get("/group/members", checkJWT, async(req,res) => {
 })
 
 //implement the function that returns the list of banned members of a given group
+app.get("/group/bannedMembers", checkJWT, async(req, res)=>{
+const user=req.userID
+const group=req.query.id
+try {
+const checkRes=await sql`select * from groups where id=${group}`
+const check=checkRes[0]
+if (check.admin!=user) {
+res.status(403)
+res.send("You are not authorized to see this information.")
+return
+}
+const task=await sql`select u.id as id, u.username as name from users u join group_banned gb on u.id=gb.user_id where group_id=${group}`
+res.status(200);
+res.json(task)
+}
+catch {
+res.status(500)
+res.send("An unknown error has occured.")
+console.log(e)
+}
+})
 
 app.post("/group/ban", checkJWT, async(req, res)=>{
 const user=req.userID
@@ -270,7 +291,7 @@ res.send("The user cannot be found.")
 return
 }
 const task=await sql`delete from group_members where user_id=${tbbUser} and group_id=${group}`
-const ban=await sql`insert into banned_members (user_id, group_id, reason) values (${tbbUser}, ${group}, ${reason})`
+const ban=await sql`insert into group_banned (user_id, group_id, reason) values (${tbbUser}, ${group}, ${reason})`
 res.status(200)
 res.send("The user has been banned.")
 }
@@ -294,6 +315,30 @@ res.send("Uh oh. Told you it wouldn't work.")
 console.log(e)
 }})
 
+app.post("/group/unban", checkJWT, async(req, res)=>{
+const user=req.userID
+const group=req.body.groupID
+const unbanUsr=req.body.id
+try {
+const checkRes=await sql`select * from groups where id=${group}`
+const check=checkRes[0]
+if (check.admin!=user) {
+res.status(403)
+res.send("You are not authorized to do this.")
+return
+}
+task=await sql`delete from group_banned where user_id=${unbanUsr}`
+res.status(200)
+res.send("The user has been unbanned successfully. They may now rejoin the group again if they wish.")
+}
+catch(e) {
+res.status(500)
+res.send("An unknown error has occured.")
+console.log(e)
+}
+})
+
+
 //here come the functions that manage activities (events)
 app.post("/activity/create", checkJWT, async(req, res)=>{
 const group=req.body.groupID
@@ -314,7 +359,7 @@ if (check.admin!=user) {
 res.status(403)
 res.send("You are not an admin of this group. You cannot create events.")
 }
-const create=await sql`insert into activities (name, time, location, details, groupID) values (${name}, ${time}, ${location}, ${details}, ${group_id})`
+const create=await sql`insert into activities (name, time, location, details, group_id) values (${name}, ${time}, ${location}, ${details}, ${group_id})`
 res.status(200)
 res.send("The activity has been created successfully")
 }
@@ -325,6 +370,27 @@ console.log(e)
 } //end catch
 })
 
+app.get("/activity/list", checkJWT, async(req, res)=>{
+const user=req.userID
+const group=req.query.groupID
+try {
+const checkRes=await sql`select * from group_members where user_id=${user} and group_id=${group}`
+const check=checkRes[0]
+if (check==undefined) {
+res.status(403)
+res.send("You are not a member of this group")
+return
+}
+const task=await sql`select name, time, location, details from activities where group_id=${group}`
+res.status(200)
+res.send(task)
+}
+catch(e) {
+res.status(500)
+res.send("An unknown error has occured")
+console.log(e)
+}
+})
 
 app.listen(process.env.PORT, ()=>{
     console.log("Server started on port "+process.env.PORT)
