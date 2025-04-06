@@ -328,7 +328,7 @@ res.status(403)
 res.send("You are not authorized to do this.")
 return
 }
-task=await sql`delete from group_banned where user_id=${unbanUsr}`
+const task=await sql`delete from group_banned where user_id=${unbanUsr}`
 res.status(200)
 res.send("The user has been unbanned successfully. They may now rejoin the group again if they wish.")
 }
@@ -360,7 +360,7 @@ if (check.admin!=user) {
 res.status(403)
 res.send("You are not an admin of this group. You cannot create events.")
 }
-const create=await sql`insert into activities (name, time, location, details, group_id) values (${name}, ${time}, ${location}, ${details}, ${group_id})`
+const create=await sql`insert into activities (name, time, location, details, group_id) values (${name}, ${time}, ${location}, ${details}, ${group})`
 res.status(200)
 res.send("The activity has been created successfully")
 }
@@ -382,7 +382,7 @@ res.status(403)
 res.send("You are not a member of this group")
 return
 }
-const task=await sql`select name, time, location, details from activities where group_id=${group}`
+const task=await sql`select id, name, time, location, details from activities where group_id=${group} order by id desc`
 res.status(200)
 res.send(task)
 }
@@ -390,6 +390,49 @@ catch(e) {
 res.status(500)
 res.send("An unknown error has occured")
 console.log(e)
+}
+})
+
+app.get("/group/admin", checkJWT, async(req, res)=>{
+const user=req.userID
+const group=req.query.groupID
+try {
+const task=await sql`select * from groups where id=${group}`
+const check=task[0]
+if (check.admin==user) {
+res.status(200)
+res.send("true")
+}
+else {
+res.status(403)
+res.send("false")
+}
+}
+catch {
+res.status(500)
+res.send("Unknown error.")
+}
+})
+
+app.post("/activity/delete", checkJWT, async(req, res)=>{
+const user=req.userID
+const act=req.body.activityID
+const group=req.body.groupID
+try {
+const checkRes=await sql`select * from groups where id=${group}`
+const check=checkRes[0]
+if (check.admin!=user) {
+res.status(403)
+res.send("You are not an admin of this group.")
+return
+}
+const task=await sql`delete from activities where id=${act}`
+res.status(200)
+res.send("The activity has been deleted successfully")
+}
+catch {
+res.status(500)
+res.send("An unknown error has occured.")
 }
 })
 
